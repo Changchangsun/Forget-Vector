@@ -7,7 +7,6 @@ import copy
 import os
 import random
 
-# from advertorch.utils import NormalizeByChannelMeanStd
 import shutil
 import sys
 import time
@@ -18,7 +17,7 @@ from torchvision import transforms
 
 from dataset import *
 from dataset import TinyImageNet
-from delta_imagenet_2 import prepare_data
+from delta_imagenet import prepare_data
 from models import *
 from timm import create_model
 
@@ -42,7 +41,6 @@ def warmup_lr(epoch, step, optimizer, one_epoch_step, args):
     for p in optimizer.param_groups:
         p["lr"] = lr
 
-#    utils.save_checkpoint(state, False, args.save_dir, args.unlearn)
 def save_checkpoint(
     state, is_SA_best, save_path, pruning, epoch,filename="checkpoint.pth.tar"
 ):
@@ -53,7 +51,6 @@ def save_checkpoint(
             filepath, os.path.join(save_path, str(pruning) + "model_SA_best.pth.tar")
         )
 
-#    checkpoint = utils.load_checkpoint(device, args.save_dir, args.unlearn)
 def load_checkpoint(device, save_path, pruning, filename="checkpoint.pth.tar"):
     filepath = os.path.join(save_path, str(pruning) + filename)
     if os.path.exists(filepath):
@@ -112,9 +109,8 @@ def dataset_convert_to_test(dataset, args=None):
 
 
 def setup_model_dataset(args):
-    if args.dataset == "cifar10_scc":
-        setup_seed(args.train_seed)##default = 1
-
+    if args.dataset == "cifar10":
+        setup_seed(args.train_seed)
         classes = 10
         normalization = NormalizeByChannelMeanStd(
             mean=[0.4914, 0.4822, 0.4465], std=[0.2470, 0.2435, 0.2616]
@@ -124,112 +120,55 @@ def setup_model_dataset(args):
             model = model_dict[args.arch](num_classes=classes,imagenet=False)#resnet18(num_classes=10)
         elif args.arch == "vgg16_bn":
             model = model_dict[args.arch](num_classes=classes)#resnet18(num_classes=10)
-
         model.normalize = normalization
-        if args.multi_classes_to_replace is not None and args.class_to_replace is not None and args.module is None:
-            print("###class wise")
-            sets = prepare_data(dataset="cifar10_scc", module = args.module, multi_classes_to_replace = args.multi_classes_to_replace, batch_size=args.batch_size,class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace, adv =args.adv,cor = args.cor,cor_type = args.cor_type,level = args.level,phase = args.phase,data_path = args.data)            
-            return model,sets
-        elif args.multi_classes_to_replace is not None and args.class_to_replace is not None and args.module=="classwise":
-            print("###class wise")
-            sets = prepare_data(dataset="cifar10_scc", module = args.module, multi_classes_to_replace = args.multi_classes_to_replace, batch_size=args.batch_size,class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace, adv =args.adv,cor = args.cor,cor_type = args.cor_type,level = args.level,phase = args.phase,data_path = args.data)            
-            return model,sets
         
-            
+        if args.class_to_replace is None and args.num_indexes_to_replace is None:###original model
+            sets = prepare_data(dataset="cifar10", batch_size=args.batch_size, class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace, 
+                                   seed=args.train_seed, single = args.single, adv=args.adv, cor=args.cor, cor_type=args.cor_type, level=args.level, 
+                                   phase=args.phase, data_path=args.data, arch=args.arch, percent = args.percent)
+            train_set, train_set_for_test, val_set = sets["train"], sets["train_for_test"], sets["val"]
+            return model, train_set, train_set_for_test, val_set
+        
+        elif args.class_to_replace is not None and args.num_indexes_to_replace is None:
+            sets = prepare_data(dataset="cifar10", batch_size=args.batch_size,class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace, adv =args.adv, cor = args.cor,cor_type = args.cor_type, level = args.level, phase = args.phase, data_path = args.data)            
+            retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, val_set_retain, val_set_forget, retain_set_adv, forget_set_adv, val_set_adv, val_retain_set_adv, val_forget_set_adv = sets["retain"], sets["forget"], sets["retain_for_test"], sets["forget_for_test"], sets['val'], sets['val_retain'], sets['val_forget'], sets["retain_adv"], sets["forget_adv"], sets["val_adv"], sets['val_retain_adv'],sets['val_forget_adv']
+            return model, retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, val_set_retain, val_set_forget, retain_set_adv, forget_set_adv, val_set_adv, val_retain_set_adv, val_forget_set_adv 
+        
         elif args.class_to_replace is None and args.num_indexes_to_replace is not None:#unlearning class-wise
-            print("###data wise")
-            sets = prepare_data(dataset="cifar10_scc", multi_classes_to_replace = args.multi_classes_to_replace, batch_size=args.batch_size, class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace,num_indexes_to_replace=args.num_indexes_to_replace,seed=args.seed,adv =args.adv,cor = args.cor,cor_type = args.cor_type,level = args.level,phase = args.phase,data_path = args.data, percent = args.percent)
-            print("###loaders end")
+            sets = prepare_data(dataset="cifar10", batch_size=args.batch_size,class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace,num_indexes_to_replace=args.num_indexes_to_replace,seed=args.seed,adv =args.adv,cor = args.cor,cor_type = args.cor_type,level = args.level,phase = args.phase,data_path = args.data, percent = args.percent)
             retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, retain_set_adv, forget_set_adv, val_set_adv = sets["retain"], sets["forget"], sets['retain_for_test'], sets['forget_for_test'], sets["val"], sets["retain_adv"], sets["forget_adv"], sets["val_adv"]
             return model, retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, retain_set_adv, forget_set_adv, val_set_adv
     elif args.dataset == "imagenet10":
         classes = 10
-        setup_seed(args.train_seed)#
+        setup_seed(args.train_seed)
 
         normalization = NormalizeByChannelMeanStd(
             mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
         )
         model = None
         if args.arch == "resnet18":
-            model = model_dict[args.arch](num_classes=classes,imagenet=True)#
-            print("3 Finish select resnet18 model.")
+            model = model_dict[args.arch](num_classes=classes,imagenet=True)
         elif args.arch == "vgg16_bn":
-            model = model_dict[args.arch](num_classes=classes)#
-            print("3 Finish select vgg16_bn model.")
-        elif args.arch == "vit":
-            model = create_model('vit_base_patch16_224', pretrained=True)
-            num_ftrs = model.head.in_features
-            model.head = nn.Linear(num_ftrs, classes) 
-            print("vit model arch")
-            print(model)
+            model = model_dict[args.arch](num_classes=classes)
 
         model.normalize = normalization
-        if args.multi_classes_to_replace is not None and args.num_indexes_to_replace is not None:
-            print("#####transfer 2 model")
-            sets = prepare_data(dataset="imagenet10", multi_classes_to_replace = args.multi_classes_to_replace, batch_size=args.batch_size, class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace,num_indexes_to_replace=args.num_indexes_to_replace,seed=args.seed,adv =args.adv,cor = args.cor,cor_type = args.cor_type,level = args.level,phase = args.phase,data_path = args.data, percent = args.percent)
-            retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, retain_set_adv, forget_set_adv, val_set_adv = sets["retain"], sets["forget"], sets['retain_for_test'], sets['forget_for_test'], sets["val"], sets["retain_adv"], sets["forget_adv"], sets["val_adv"]
-            print("multi_classes_to_replace return")
-            return model, retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, retain_set_adv, forget_set_adv, val_set_adv
         
-        elif args.class_to_replace is None and args.num_indexes_to_replace is None:###original model
-            print("###original model")
+        if args.class_to_replace is None and args.num_indexes_to_replace is None:
             sets = prepare_data(dataset="imagenet10", batch_size=args.batch_size,class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace, single = args.single, phase = args.phase,data_path = args.data)
-            # train_loader, val_loader,test_loader = loaders["train"], loaders["val"],loaders["test"]
             train_set, train_set_for_test, val_set = sets["train"], sets["train_for_test"], sets["val"]
             return model, train_set, train_set_for_test, val_set
             
-        elif args.class_to_replace is not None and args.num_indexes_to_replace is None:#unlearning class-wise
-            print("###class wise")
+        elif args.class_to_replace is not None and args.num_indexes_to_replace is None:
             sets = prepare_data(dataset="imagenet10", batch_size=args.batch_size,class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace, adv =args.adv,cor = args.cor,cor_type = args.cor_type,level = args.level,phase = args.phase,data_path = args.data)
             retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, val_set_retain, val_set_forget, retain_set_adv, forget_set_adv, val_set_adv, val_retain_set_adv, val_forget_set_adv = sets["retain"], sets["forget"], sets["retain_for_test"], sets["forget_for_test"], sets['val'], sets['val_retain'], sets['val_forget'], sets["retain_adv"], sets["forget_adv"], sets["val_adv"], sets['val_retain_adv'],sets['val_forget_adv']
             return model,retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, val_set_retain, val_set_forget, retain_set_adv, forget_set_adv, val_set_adv, val_retain_set_adv, val_forget_set_adv 
         
-        elif args.class_to_replace is None and args.num_indexes_to_replace is not None:#unlearning class-wise
-            print("###data wise")
+        elif args.class_to_replace is None and args.num_indexes_to_replace is not None:
             sets = prepare_data(dataset="imagenet10", batch_size=args.batch_size,class_to_replace = args.class_to_replace, indexes_to_replace = args.indexes_to_replace,num_indexes_to_replace=args.num_indexes_to_replace,seed=args.seed,adv =args.adv,cor = args.cor,cor_type = args.cor_type,level = args.level,phase = args.phase,data_path = args.data)
             retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, retain_set_adv, forget_set_adv, val_set_adv = sets["retain"], sets["forget"], sets['retain_for_test'], sets['forget_for_test'], sets["val"], sets["retain_adv"], sets["forget_adv"], sets["val_adv"]
             return model, retain_set, forget_set, retain_set_for_test, forget_set_for_test, val_set, retain_set_adv, forget_set_adv, val_set_adv                    
-        
-        classes = 10
-        normalization = NormalizeByChannelMeanStd(
-            mean=[0.4377, 0.4438, 0.4728], std=[0.1980, 0.2010, 0.1970]
-        )
-        train_full_loader, val_loader, _ = svhn_dataloaders(
-            batch_size=args.batch_size, data_dir=args.data, num_workers=args.workers
-        )
-        marked_loader, _, test_loader = svhn_dataloaders(
-            batch_size=args.batch_size,
-            data_dir=args.data,
-            num_workers=args.workers,
-            class_to_replace=args.class_to_replace,
-            num_indexes_to_replace=args.num_indexes_to_replace,
-            indexes_to_replace=args.indexes_to_replace,
-            seed=args.seed,
-            only_mark=True,
-            shuffle=True,
-        )
-        if args.imagenet_arch:
-            model = model_dict[args.arch](num_classes=classes, imagenet=True)
-        else:
-            model = model_dict[args.arch](num_classes=classes)
-
-        model.normalize = normalization
-        print(model)
-        return model, train_full_loader, val_loader, test_loader, marked_loader
     else:
         raise ValueError("Dataset not supprot yet !")
-    # import pdb;pdb.set_trace()
-
-    if args.imagenet_arch:
-        model = model_dict[args.arch](num_classes=classes, imagenet=True)
-    else:
-        model = model_dict[args.arch](num_classes=classes)
-
-    model.normalize = normalization
-    print(model)
-
-    return model, train_set_loader, val_loader, test_loader
-
 
 def setup_seed(seed):
     print("setup random seed = {}".format(seed))
@@ -238,7 +177,6 @@ def setup_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
-
 
 class NormalizeByChannelMeanStd(torch.nn.Module):
     def __init__(self, mean, std):

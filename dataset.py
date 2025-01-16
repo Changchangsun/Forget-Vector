@@ -574,27 +574,107 @@ def cifar10_dataloaders(
     train_set.targets = np.array(train_set.targets)
     test_set.targets = np.array(test_set.targets)
     
-
+    print("######",len(train_set.data),len(train_set.targets))
+    print("######",len(test_set.data),len(test_set.targets))
+    # print(train_set.data[0],train_set.targets[0],"$$$$$$$$$$$$$$$$")
+    
+    """
+    将train和test数据集保存成单张图片的形式
+    """
     from PIL import Image
     from tqdm import tqdm
+    # path = "/egr/research-optml/sunchan5/MU/Unlearn-Sparse/datasets/cifar10/train"
+    # for i in tqdm(range(len(train_set.data))):
+    #     # 将 NumPy 数组转换为 PIL 图像
+    #     # print(train_set.data[i].shape)
+    #     image = Image.fromarray(train_set.data[i])
+    #     label = train_set.targets[i]
+    #     class_path = os.path.join(path,str(label))
+    #     if not os.path.exists(class_path):
+    #         os.mkdir(class_path)
+    #     # 保存图片
+    #     image.save(os.path.join(class_path,str(i)+".png"))
+    
+    # path = "/egr/research-optml/sunchan5/MU/Unlearn-Sparse/datasets/cifar10/test"
+    # for i in tqdm(range(len(test_set.data))):
+    #     # 将 NumPy 数组转换为 PIL 图像
+    #     image = Image.fromarray(test_set.data[i])
+    #     label = test_set.targets[i]
+    #     class_path = os.path.join(path,str(label))
+    #     if not os.path.exists(class_path):
+    #         os.mkdir(class_path)
+    #     # 保存图片
+    #     image.save(os.path.join(class_path,str(i)+".png"))
 
     rng = np.random.RandomState(seed)
     valid_set = copy.deepcopy(train_set)
     valid_idx = []
     for i in range(max(train_set.targets) + 1):
-        class_idx = np.where(train_set.targets == i)[0]
-
+        class_idx = np.where(train_set.targets == i)[0]#每个类的图片数
+        # valid_idx.append(
+        #     rng.choice(class_idx, int(0.1 * len(class_idx)), replace=False)#replace False: repeat select is not allowed.
+        # )
         select = rng.choice(class_idx, int(0.1 * len(class_idx)), replace=False)
         valid_idx.append(select
-                 )
-
+            #replace False: repeat select is not allowed.
+        )
+        # print(len(select),"%%%%%%%%%%%%%%")
+        # # print(select)
+        # path = "/egr/research-optml/sunchan5/MU/Unlearn-Sparse/datasets/cifar10/valid"
+        # for idx in tqdm(select):
+        # # 将 NumPy 数组转换为 PIL 图像
+        #     image = Image.fromarray(train_set.data[idx])
+        #     label = train_set.targets[idx]
+        #     class_path = os.path.join(path,str(label))
+        #     if not os.path.exists(class_path):
+        #         os.mkdir(class_path)
+        # # 保存图片
+        #     image.save(os.path.join(class_path,str(idx)+".png"))
+        
     valid_idx = np.hstack(valid_idx)
     train_set_copy = copy.deepcopy(train_set)
+    # print("#####valid_idx",valid_idx)
+    # print(len(valid_idx),"valid_idx length")
+    # path = "/egr/research-optml/sunchan5/MU/Unlearn-Sparse/datasets/cifar10/valid"
+    # for i in tqdm(valid_idx):
+    #     # 将 NumPy 数组转换为 PIL 图像
+    #     image = Image.fromarray(train_set.data[i])
+    #     label = train_set.targets[i]
+    #     class_path = os.path.join(path,str(label))
+    #     if not os.path.exists(class_path):
+    #         os.mkdir(class_path)
+    #     # 保存图片
+    #     image.save(os.path.join(class_path,str(i)+".png"))
+    
+    # all_idx = list(range(50000))
+    # print(all_idx)
+    # train_idx = np.setdiff1d(all_idx, valid_idx)
+    # print(len(train_idx),"retain_idx length")
+    # path = "/egr/research-optml/sunchan5/MU/Unlearn-Sparse/datasets/cifar10/train"
+    # for i in tqdm(train_idx):
+    #     # 将 NumPy 数组转换为 PIL 图像
+    #     image = Image.fromarray(train_set.data[i])
+    #     label = train_set.targets[i]
+    #     class_path = os.path.join(path,str(label))
+    #     if not os.path.exists(class_path):
+    #         os.mkdir(class_path)
+    #     # 保存图片
+    #     image.save(os.path.join(class_path,str(i)+".png"))
 
-        valid_set.data = train_set_copy.data[valid_idx]
+    valid_set.data = train_set_copy.data[valid_idx]
     valid_set.targets = train_set_copy.targets[valid_idx]
 
     train_idx = list(set(range(len(train_set))) - set(valid_idx))
+    # path = "/egr/research-optml/sunchan5/MU/Unlearn-Sparse/datasets/cifar10/train"
+    # for i in tqdm(train_idx):
+    #     # 将 NumPy 数组转换为 PIL 图像
+    #     image = Image.fromarray(train_set.data[i])
+    #     label = train_set.targets[i]
+    #     class_path = os.path.join(path,str(label))
+    #     if not os.path.exists(class_path):
+    #         os.mkdir(class_path)
+    #     # 保存图片
+    #     image.save(os.path.join(class_path,str(i)+".png"))
 
     train_set.data = train_set_copy.data[train_idx]
     train_set.targets = train_set_copy.targets[train_idx]
